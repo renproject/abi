@@ -7,12 +7,10 @@ import (
 	"github.com/renproject/surge"
 )
 
-const (
-	// MaxSize in bytes that an ABI object can consume. Currently, this is set
-	// to 32MB. For abstract data types, the size of the object includes all
-	// inner objects.
-	MaxSize = 32 * 1024 * 1024
-)
+// MaxSize in bytes that an ABI object can consume. Currently, this is set
+// to 32MB. For abstract data types, the size of the object includes all
+// inner objects.
+var MaxSize uint32 = 32 * 1024 * 1024
 
 type Type uint16
 
