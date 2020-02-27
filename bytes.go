@@ -1,6 +1,8 @@
 package abi
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -42,12 +44,33 @@ func (b Bytes) SizeHint() int {
 	return 4 + len(b) // Length prefix + number of bytes in the slice
 }
 
+func (b Bytes) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.String())
+}
+
+func (b *Bytes) UnmarshalJSON(data []byte) error {
+	var bString string
+	if err := json.Unmarshal(data, &bString); err != nil {
+		return err
+	}
+	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(bString)
+	if err != nil {
+		return err
+	}
+	*b = data
+	return nil
+}
+
 func (b Bytes) Type() Type {
 	return TypeBytes
 }
 
 func (b Bytes) Len() int {
 	return len(b)
+}
+
+func (b Bytes) String() string {
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b)
 }
 
 type Bytes32 [32]byte
@@ -68,6 +91,30 @@ func (b Bytes32) SizeHint() int {
 	return 32
 }
 
+func (b Bytes32) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.String())
+}
+
+func (b *Bytes32) UnmarshalJSON(data []byte) error {
+	var bString string
+	if err := json.Unmarshal(data, &bString); err != nil {
+		return err
+	}
+	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(bString)
+	if err != nil {
+		return err
+	}
+	if len(data) != 32 {
+		return fmt.Errorf("expected len=32, got len=%v", len(data))
+	}
+	copy(b[:], data)
+	return nil
+}
+
 func (b Bytes32) Type() Type {
 	return TypeBytes32
+}
+
+func (b Bytes32) String() string {
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b[:])
 }
