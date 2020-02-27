@@ -9,36 +9,32 @@ import (
 	"github.com/renproject/surge"
 )
 
-const (
-	maxRecordFieldNameLength = 64
-)
-
-type field struct {
-	name  string
-	value Value
-}
-
 type Record struct {
 	inner []field
 }
 
 func (record Record) Marshal(w io.Writer) error {
+	// Write length prefix
 	b := [4]byte{}
 	binary.LittleEndian.PutUint32(b[:], uint32(len(record.inner)))
-	if err := w.Write(b[:]); err != nil {
+	if _, err := w.Write(b[:]); err != nil {
 		return err
 	}
+
 	for _, field := range record.inner {
-		// Marshal the field name
+		// Write length prefix for the field name
 		name := []byte(field.name)
-		nameLen := uint32(len(name))
-		if err := surge.Marshal(uint32(name), w); err != nil {
+		b := [2]byte{}
+		binary.LittleEndian.PutUint16(b[:], uint16(len(name)))
+		if _, err := w.Write(b[:]); err != nil {
 			return err
 		}
+		// Write field name
 		if _, err := w.Write(name); err != nil {
 			return err
 		}
-		// Marshal the field value
+		// Write field value using top-level marshaling function so that type
+		// information is written
 		if err := Marshal(field.value, w); err != nil {
 			return err
 		}
@@ -47,65 +43,67 @@ func (record Record) Marshal(w io.Writer) error {
 }
 
 func (record *Record) Unmarshal(r io.Reader) error {
-	_, err := record.unmarshalAbstractDataType(r, MaxAbstractDataTypeSize)
+	_, err := record.unmarshalAndReturnSize(r, MaxSize)
 	return err
 }
 
-func (record *Record) unmarshalAbstractDataType(r io.Reader, abstractDataTypeSizeLimit int) (int, error) {
-	size := uint32(0)
-	if err := Unmarshal(&size, r); err != nil {
-		return size, err
+func (record *Record) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint32, error) {
+	len := uint32(0)
+	if err := surge.Unmarshal(&len, r); err != nil {
+		return 0, err
 	}
 
 	// Restrict the size of the abstract data type to prevent forced OOM
 	// allocations.
-	if size > abstractDataTypeSizeLimit {
-		return size, fmt.Errorf("expected size<=%v, got size=%v", MaxRecordLen, size)
+	if len > maxSize {
+		return 0, fmt.Errorf("expected size<=%v, got size>=%v", maxSize, len)
 	}
-	abstractDataTypeSizeLimit -= size
+	record.inner = make([]field, 0, len)
 
-	record.inner := make([]field, size)
-	for i := 0; i < len; i++ {
-		// Unmarshal field name
-		nameLen := uint32(0)
+	sizeInBytes := uint32(0)
+	for i := uint32(0); i < len; i++ {
+		// Unmarshal the field name.
+		nameLen := uint16(0)
 		if err := surge.Unmarshal(&nameLen, r); err != nil {
-			return err
+			return sizeInBytes, err
 		}
-		if nameLen > maxRecordFieldNameLength {
-			return fmt.Errorf("expected len<=%v, got len=%v", maxRecordFieldNameLength, nameLen)
+		if uint32(nameLen) > maxSize {
+			return sizeInBytes, fmt.Errorf("expected len<=%v, got len=%v", maxSize, nameLen)
 		}
 		nameData := make([]byte, nameLen)
 		if _, err := io.ReadFull(r, nameData); err != nil {
-			return err
+			return sizeInBytes, err
 		}
 		name := string(nameData)
-		size += nameLen
-		abstractDataTypeSizeLimit -= nameLen
-		if abstractDataTypeSizeLimit < 0 {
-			return size, fmt.Errorf("exceeded maximum abstract data size")
+		sizeInBytes += uint32(nameLen)
+		maxSize -= uint32(nameLen)
+		if maxSize < 0 {
+			return sizeInBytes, fmt.Errorf("exceeded maximum size")
 		}
 
-		// Unmarshal field value
-		value, abstractDataTypeSize, err := unmarshal(r, abstractDataTypeSizeLimit)
+		// Unmarshal field value using the top-level unmarshaling function so
+		// that type information is read.
+		value, valueSize, err := unmarshalAndReturnSize(r, maxSize)
 		if err != nil {
-			return size, err
+			return sizeInBytes, err
 		}
-
-		// Handle the size of abstract data types within abstract data types.
-		abstractDataTypeSizeLimit -= abstractDataTypeSize
-		if abstractDataTypeSizeLimit < 0 {
-			return size, fmt.Errorf("exceeded maximum abstract data size")
+		sizeInBytes += valueSize
+		maxSize -= valueSize
+		if maxSize < 0 {
+			return sizeInBytes, fmt.Errorf("exceeded maximum size")
 		}
-		record.inner[i] = field{name: name, value: value}
+		record.inner = append(record.inner, field{name: name, value: value})
 	}
-
-	return size, nil
+	return sizeInBytes, nil
 }
 
-func (ls Record) SizeHint() int {
+func (record Record) SizeHint() int {
 	size := 4 // Size of length prefix
-	for _, elem := range ls {
-		size += elem.SizeHint()
+	for _, field := range record.inner {
+		size += 2                       // Size of field name length prefix
+		size += len([]byte(field.name)) // Size of field name
+		size += 2                       // Size of field value type prefix
+		size += field.value.SizeHint()  // Size of field value
 	}
 	return size
 }
@@ -123,13 +121,13 @@ func (record *Record) Set(k string, v Value) {
 		return
 	}
 	if record.inner[i].name == k {
-		record.inner[i].name = v
+		record.inner[i].value = v
 		return
 	}
 	record.inner = append(record.inner[:i], append([]field{field{name: k, value: v}}, record.inner[i:]...)...)
 }
 
-func (record *Record) Remove(i int) {
+func (record *Record) Remove(k string) {
 	i := sort.Search(len(record.inner), func(i int) bool {
 		return record.inner[i].name >= k
 	})
@@ -149,7 +147,7 @@ func (record Record) Get(k string) (Value, bool) {
 	return record.inner[i].value, true
 }
 
-func (record Record) Size() int {
+func (record Record) Len() int {
 	return len(record.inner)
 }
 
@@ -157,4 +155,9 @@ func (record Record) ForEach(f func(k string, v Value)) {
 	for _, field := range record.inner {
 		f(field.name, field.value)
 	}
+}
+
+type field struct {
+	name  string
+	value Value
 }
