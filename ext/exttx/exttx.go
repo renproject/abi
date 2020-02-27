@@ -11,8 +11,6 @@ import (
 	"github.com/renproject/surge"
 )
 
-var MaxArguments = 8
-
 func ComputeTxHash(to abi.String, in Arguments) abi.Bytes32 {
 	buf := new(bytes.Buffer)
 	buf.Grow(int(to.SizeHint() + in.SizeHint()))
