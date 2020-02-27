@@ -8,15 +8,18 @@ import (
 )
 
 const (
-	MaxBytesLength          = 1000000 // 1MB is the maximum number of bytes.
-	MaxAbstractDataTypeSize = 10000   // 10K elements is the most elements that an abstract data type can have.
+	// MaxSize in bytes that an ABI object can consume. Currently, this is set
+	// to 32MB. For abstract data types, the size of the object includes all
+	// inner objects.
+	MaxSize = 32 * 1024 * 1024
 )
 
 type Type uint16
 
 const (
 	// Bytes
-	TypeBytes = Type(1)
+	TypeBytes   = Type(1)
+	TypeBytes32 = Type(2)
 
 	// Data types
 	TypeU8   = Type(11)
@@ -33,7 +36,6 @@ const (
 
 type Value interface {
 	surge.Marshaler
-	surge.SizeHinter
 	Type() Type
 }
 
@@ -41,86 +43,93 @@ func Marshal(v Value, w io.Writer) error {
 	if err := surge.Marshal(uint16(v.Type()), w); err != nil {
 		return fmt.Errorf("error marshaling type: %v", err)
 	}
-	if err := v.Interface.Marshal(w); err != nil {
+	if err := v.Marshal(w); err != nil {
 		return fmt.Errorf("error marshaling interface: %v", err)
 	}
 	return nil
 }
 
 func Unmarshal(r io.Reader) (Value, error) {
-	v, _, err := unmarshal(r, true)
+	v, _, err := unmarshalAndReturnSize(r, MaxSize)
 	return v, err
 }
 
-func unmarshal(r io.Reader, abstractDataTypeSizeLimit int) (Value, int, error) {
+func unmarshalAndReturnSize(r io.Reader, maxSize uint32) (Value, uint32, error) {
 	ty := uint16(0)
 	if err := surge.Unmarshal(&ty, r); err != nil {
-		return fmt.Errorf("error unmarshaling type: %v", err)
+		return nil, 0, fmt.Errorf("error unmarshaling type: %v", err)
 	}
 
 	switch Type(ty) {
 	// Bytes
-	case Bytes:
+	case TypeBytes:
 		v := Bytes{}
-		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling bytes: %v", err)
+		len, err := v.unmarshalAndReturnLength(r)
+		if err != nil {
+			return nil, len, fmt.Errorf("error unmarshaling bytes: %v", err)
 		}
-		return v, 0, nil
+		return v, len, nil
+	case TypeBytes32:
+		v := Bytes32{}
+		if err := v.Unmarshal(r); err != nil {
+			return nil, 32, fmt.Errorf("error unmarshaling bytes: %v", err)
+		}
+		return v, 32, nil
 
 	// Data types
-	case U8:
+	case TypeU8:
 		v := U8{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u8: %v", err)
+			return nil, 1, fmt.Errorf("error unmarshaling u8: %v", err)
 		}
-		return v, 0, nil
-	case U16:
+		return v, 1, nil
+	case TypeU16:
 		v := U16{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u16: %v", err)
+			return nil, 2, fmt.Errorf("error unmarshaling u16: %v", err)
 		}
-		return v, 0, nil
-	case U32:
+		return v, 2, nil
+	case TypeU32:
 		v := U32{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u32: %v", err)
+			return nil, 4, fmt.Errorf("error unmarshaling u32: %v", err)
 		}
-		return v, 0, nil
-	case U64:
+		return v, 4, nil
+	case TypeU64:
 		v := U64{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u64: %v", err)
+			return nil, 8, fmt.Errorf("error unmarshaling u64: %v", err)
 		}
-		return v, 0, nil
-	case U128:
+		return v, 8, nil
+	case TypeU128:
 		v := U128{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u128: %v", err)
+			return nil, 16, fmt.Errorf("error unmarshaling u128: %v", err)
 		}
-		return v, 0, nil
-	case U256:
+		return v, 16, nil
+	case TypeU256:
 		v := U256{}
 		if err := v.Unmarshal(r); err != nil {
-			return nil, fmt.Errorf("error unmarshaling u256: %v", err)
+			return nil, 32, fmt.Errorf("error unmarshaling u256: %v", err)
 		}
-		return v, 0, nil
+		return v, 32, nil
 
 	// Abstract data types
 	case TypeList:
 		v := List{}
-		size, err := v.unmarshalAbstractDataType(r, abstractDataTypeSizeLimit)
+		size, err := v.unmarshalAndReturnSize(r, maxSize)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error unmarshaling list: %v", err)
+			return nil, size, fmt.Errorf("error unmarshaling list: %v", err)
 		}
 		return v, size, nil
 	case TypeRecord:
 		v := Record{}
-		size, err := v.unmarshalAbstractDataType(r, abstractDataTypeSizeLimit)
+		size, err := v.unmarshalAndReturnSize(r, maxSize)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error unmarshaling list: %v", err)
+			return nil, size, fmt.Errorf("error unmarshaling record: %v", err)
 		}
 		return v, size, nil
 	}
 
-	return nil, fmt.Errorf("error unmarshaling value: unexpected type=%v", ty)
+	return nil, 0, fmt.Errorf("error unmarshaling value: unexpected type=%v", ty)
 }
