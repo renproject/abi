@@ -1,9 +1,11 @@
 package abi
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
+	"strconv"
 
 	"github.com/renproject/surge"
 )
@@ -26,6 +28,23 @@ func (u8 *U8) Unmarshal(r io.Reader) error {
 
 func (u8 U8) SizeHint() int {
 	return 1
+}
+
+func (u8 U8) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u8.String())
+}
+
+func (u8 *U8) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	x, err := strconv.ParseUint(xString, 10, 8)
+	if err != nil {
+		return err
+	}
+	u8.inner = uint8(x)
+	return nil
 }
 
 func (U8) Type() Type {
@@ -94,6 +113,23 @@ func (u16 U16) SizeHint() int {
 	return 2
 }
 
+func (u16 U16) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u16.String())
+}
+
+func (u16 *U16) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	x, err := strconv.ParseUint(xString, 10, 16)
+	if err != nil {
+		return err
+	}
+	u16.inner = uint16(x)
+	return nil
+}
+
 func (U16) Type() Type {
 	return TypeU16
 }
@@ -160,6 +196,23 @@ func (u32 U32) SizeHint() int {
 	return 4
 }
 
+func (u32 U32) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u32.String())
+}
+
+func (u32 *U32) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	x, err := strconv.ParseUint(xString, 10, 32)
+	if err != nil {
+		return err
+	}
+	u32.inner = uint32(x)
+	return nil
+}
+
 func (U32) Type() Type {
 	return TypeU32
 }
@@ -224,6 +277,23 @@ func (u64 *U64) Unmarshal(r io.Reader) error {
 
 func (u64 U64) SizeHint() int {
 	return 8
+}
+
+func (u64 U64) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u64.String())
+}
+
+func (u64 *U64) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	x, err := strconv.ParseUint(xString, 10, 64)
+	if err != nil {
+		return err
+	}
+	u64.inner = x
+	return nil
 }
 
 func (U64) Type() Type {
@@ -298,6 +368,28 @@ func (u128 *U128) Unmarshal(r io.Reader) error {
 
 func (u128 U128) SizeHint() int {
 	return 16
+}
+
+func (u128 U128) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u128.String())
+}
+
+func (u128 *U128) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	if u128.inner == nil {
+		u128.inner = new(big.Int)
+	}
+	_, ok := u128.inner.SetString(xString, 10)
+	if !ok {
+		return fmt.Errorf("bad 128-bit unsigned integer=%v", xString)
+	}
+	if u128.inner.Cmp(MaxU128.inner) > 0 {
+		return fmt.Errorf("overflow 256-bit unsigned integer=%v", xString)
+	}
+	return nil
 }
 
 func (U128) Type() Type {
@@ -386,6 +478,28 @@ func (u256 *U256) Unmarshal(r io.Reader) error {
 
 func (u256 U256) SizeHint() int {
 	return 32
+}
+
+func (u256 U256) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u256.String())
+}
+
+func (u256 *U256) UnmarshalJSON(data []byte) error {
+	var xString string
+	if err := json.Unmarshal(data, &xString); err != nil {
+		return err
+	}
+	if u256.inner == nil {
+		u256.inner = new(big.Int)
+	}
+	_, ok := u256.inner.SetString(xString, 10)
+	if !ok {
+		return fmt.Errorf("bad 256-bit unsigned integer=%v", xString)
+	}
+	if u256.inner.Cmp(MaxU256.inner) > 0 {
+		return fmt.Errorf("overflow 256-bit unsigned integer=%v", xString)
+	}
+	return nil
 }
 
 func (U256) Type() Type {
