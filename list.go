@@ -53,8 +53,12 @@ func (ls *List) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint32, err
 		return 0, fmt.Errorf("expected size<=%v, got size=%v", maxSize, len)
 	}
 	ls.inner = make([]Value, 0, len)
+	maxSize -= len
+	if maxSize < 0 {
+		return len, fmt.Errorf("exceeded maximum size")
+	}
 
-	sizeInBytes := uint32(0)
+	sizeInBytes := len
 	for i := uint32(0); i < len; i++ {
 		// Use top-level unmarshaling function so that type information is read.
 		elem, elemSize, err := unmarshalAndReturnSize(r, maxSize)
@@ -64,8 +68,8 @@ func (ls *List) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint32, err
 
 		// Restrict the size of the abstract data type to prevent malicious input
 		// forcing massive memory allocations.
-		sizeInBytes += elemSize
-		maxSize -= elemSize
+		sizeInBytes += (elemSize - 1) // Offset by -1, because we started with sizeInBytes := len
+		maxSize -= (elemSize - 1)     // Offset by -1, because we have already done maxSize -= len
 		if maxSize < 0 {
 			return sizeInBytes, fmt.Errorf("exceeded maximum size")
 		}

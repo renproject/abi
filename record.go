@@ -59,8 +59,12 @@ func (record *Record) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint3
 		return 0, fmt.Errorf("expected size<=%v, got size>=%v", maxSize, len)
 	}
 	record.inner = make([]field, 0, len)
+	maxSize -= len
+	if maxSize < 0 {
+		return len, fmt.Errorf("exceeded maximum size")
+	}
 
-	sizeInBytes := uint32(0)
+	sizeInBytes := len
 	for i := uint32(0); i < len; i++ {
 		// Unmarshal the field name.
 		nameLen := uint16(0)
@@ -75,7 +79,7 @@ func (record *Record) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint3
 			return sizeInBytes, err
 		}
 		name := string(nameData)
-		sizeInBytes += uint32(nameLen)
+		sizeInBytes += uint32(nameLen) // The offset of -1 is counted when unmarshaling the value.
 		maxSize -= uint32(nameLen)
 		if maxSize < 0 {
 			return sizeInBytes, fmt.Errorf("exceeded maximum size")
@@ -87,8 +91,8 @@ func (record *Record) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint3
 		if err != nil {
 			return sizeInBytes, err
 		}
-		sizeInBytes += valueSize
-		maxSize -= valueSize
+		sizeInBytes += (valueSize - 1) // Offset by -1, because we started with sizeInBytes := len
+		maxSize -= (valueSize - 1)     // Offset by -1, because we have already done maxSize -= len
 		if maxSize < 0 {
 			return sizeInBytes, fmt.Errorf("exceeded maximum size")
 		}
@@ -100,7 +104,7 @@ func (record *Record) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint3
 func (record Record) SizeHint() int {
 	size := 4 // Size of length prefix
 	for _, field := range record.inner {
-		size += 2                       // Size of field name length prefix
+		size += 2                       // Size of field name length prefix (note: we use uint16 for the length of field names)
 		size += len([]byte(field.name)) // Size of field name
 		size += 2                       // Size of field value type prefix
 		size += field.value.SizeHint()  // Size of field value
