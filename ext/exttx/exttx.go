@@ -11,7 +11,7 @@ import (
 	"github.com/renproject/surge"
 )
 
-func ComputeTxHash(to abi.String, in Arguments) abi.Bytes32 {
+func TxHash(to abi.String, in Arguments) abi.Bytes32 {
 	buf := new(bytes.Buffer)
 	buf.Grow(int(to.SizeHint() + in.SizeHint()))
 	if _, err := to.Marshal(buf); err != nil {
@@ -39,7 +39,7 @@ func NewTx(to abi.String, in, autogen, out Arguments) Tx {
 		Autogen: autogen,
 		Out:     out,
 	}
-	tx.Hash = ComputeTxHash(to, in)
+	tx.Hash = TxHash(to, in)
 	return tx
 }
 
