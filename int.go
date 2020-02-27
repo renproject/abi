@@ -115,6 +115,10 @@ func NewU16(x uint16) U16 {
 	return U16{inner: x}
 }
 
+func NewU16FromU8(x U8) U16 {
+	return U16{inner: uint16(x.Uint8())}
+}
+
 func (u16 U16) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u16.inner, w)
 }
@@ -196,6 +200,14 @@ type U32 struct {
 
 func NewU32(x uint32) U32 {
 	return U32{inner: x}
+}
+
+func NewU32FromU8(x U8) U32 {
+	return U32{inner: uint32(x.Uint8())}
+}
+
+func NewU32FromU16(x U16) U32 {
+	return U32{inner: uint32(x.Uint16())}
 }
 
 func (u32 U32) Marshal(w io.Writer) (uint32, error) {
@@ -281,6 +293,18 @@ func NewU64(x uint64) U64 {
 	return U64{inner: x}
 }
 
+func NewU64FromU8(x U8) U64 {
+	return U64{inner: uint64(x.Uint8())}
+}
+
+func NewU64FromU16(x U16) U64 {
+	return U64{inner: uint64(x.Uint16())}
+}
+
+func NewU64FromU32(x U32) U64 {
+	return U64{inner: uint64(x.Uint32())}
+}
+
 func (u64 U64) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u64.inner, w)
 }
@@ -362,6 +386,32 @@ type U128 struct {
 
 func NewU128(x [16]byte) U128 {
 	return U128{inner: new(big.Int).SetBytes(x[:])}
+}
+
+func NewU128FromU8(x U8) U128 {
+	return U128{inner: new(big.Int).SetUint64(uint64(x.Uint8()))}
+}
+
+func NewU128FromU16(x U16) U128 {
+	return U128{inner: new(big.Int).SetUint64(uint64(x.Uint16()))}
+}
+
+func NewU128FromU32(x U32) U128 {
+	return U128{inner: new(big.Int).SetUint64(uint64(x.Uint32()))}
+}
+
+func NewU128FromU64(x U64) U128 {
+	return U128{inner: new(big.Int).SetUint64(x.Uint64())}
+}
+
+func NewU128FromInt(x *big.Int) U128 {
+	if x.Sign() == -1 {
+		panic("underflow")
+	}
+	if x.Cmp(MaxU128.inner) > 0 {
+		panic("overflow")
+	}
+	return U128{inner: new(big.Int).Set(x)}
 }
 
 func (u128 U128) Marshal(w io.Writer) (uint32, error) {
@@ -476,6 +526,36 @@ type U256 struct {
 
 func NewU256(x [32]byte) U256 {
 	return U256{inner: new(big.Int).SetBytes(x[:])}
+}
+
+func NewU256FromU8(x U8) U256 {
+	return U256{inner: new(big.Int).SetUint64(uint64(x.Uint8()))}
+}
+
+func NewU256FromU16(x U16) U256 {
+	return U256{inner: new(big.Int).SetUint64(uint64(x.Uint16()))}
+}
+
+func NewU256FromU32(x U32) U256 {
+	return U256{inner: new(big.Int).SetUint64(uint64(x.Uint32()))}
+}
+
+func NewU256FromU64(x U64) U256 {
+	return U256{inner: new(big.Int).SetUint64(x.Uint64())}
+}
+
+func NewU256FromU128(x U128) U256 {
+	return U256{inner: new(big.Int).Set(x.Int())}
+}
+
+func NewU256FromInt(x *big.Int) U256 {
+	if x.Sign() == -1 {
+		panic("underflow")
+	}
+	if x.Cmp(MaxU256.inner) > 0 {
+		panic("overflow")
+	}
+	return U256{inner: new(big.Int).Set(x)}
 }
 
 func (u256 U256) Marshal(w io.Writer) (uint32, error) {
