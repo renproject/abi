@@ -7,45 +7,67 @@ import (
 	"github.com/renproject/surge"
 )
 
-type Bytes struct {
-	inner []byte
-}
+type Bytes []byte
 
-func (bytes Bytes) Marshal(w io.Writer) error {
-	len := uint32(len(bytes.inner))
+func (b Bytes) Marshal(w io.Writer) error {
+	len := uint32(len(b))
 	if err := surge.Marshal(uint32(len), w); err != nil {
 		return err
 	}
-	_, err := w.Write(bytes.inner)
+	_, err := w.Write(b)
 	return err
 }
 
-func (bytes *Bytes) Unmarshal(r io.Reader) error {
+func (b *Bytes) Unmarshal(r io.Reader) error {
+	_, err := b.unmarshalAndReturnLength(r)
+	return err
+}
+
+func (b *Bytes) unmarshalAndReturnLength(r io.Reader) (uint32, error) {
 	len := uint32(0)
 	if err := surge.Unmarshal(&len, r); err != nil {
-		return err
+		return len, err
 	}
-	if len > MaxBytesLength {
-		return fmt.Errorf("expected len<=%v, got len=%v", MaxBytesSize, len)
+	if len > MaxSize {
+		return len, fmt.Errorf("expected len<=%v, got len=%v", MaxSize, len)
 	}
-	*v = make([]byte, len)
-	if _, err := io.ReadFull(r, *v); err != nil {
+	*b = make([]byte, len)
+	if _, err := io.ReadFull(r, *b); err != nil {
+		return len, err
+	}
+	return len, nil
+}
+
+func (b Bytes) SizeHint() int {
+	return 4 + len(b) // Length prefix + number of bytes in the slice
+}
+
+func (b Bytes) Type() Type {
+	return TypeBytes
+}
+
+func (b Bytes) Len() int {
+	return len(b)
+}
+
+type Bytes32 [32]byte
+
+func (b Bytes32) Marshal(w io.Writer) error {
+	_, err := w.Write(b[:])
+	return err
+}
+
+func (b *Bytes32) Unmarshal(r io.Reader) error {
+	if _, err := io.ReadFull(r, (*b)[:]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (bytes Bytes) SizeHint() int {
-	return 4 + len(bytes.inner) // Length prefix + number of bytes in the slice
+func (b Bytes32) SizeHint() int {
+	return 32
 }
 
-func (bytes Bytes) Type() Type {
-	return TypeBytes
-}
-
-func (bytes Bytes) Equal(other Value) bool {
-	if v, ok := other.(Bytes); ok {
-		return bytes.Equal(bytes.inner, v.inner)
-	}
-	return false
+func (b Bytes32) Type() Type {
+	return TypeBytes32
 }
