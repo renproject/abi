@@ -6,6 +6,7 @@ import (
 	"testing/quick"
 
 	"github.com/renproject/abi"
+	"github.com/renproject/surge"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -23,11 +24,11 @@ var _ = Describe("Bytes", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				y := abi.Bytes(random)
-				err = y.Marshal(buf)
+				_, err = y.Marshal(buf)
 				Expect(err).ToNot(HaveOccurred())
 
 				z := abi.Bytes{}
-				err = z.Unmarshal(buf)
+				_, err = z.Unmarshal(buf, surge.MaxBytes)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(y).To(Equal(z))
@@ -72,7 +73,7 @@ var _ = Describe("Bytes", func() {
 				9, 0, 1, 2, 3, 4, 5, 6, // Data
 			}
 			b := abi.Bytes{}
-			err := b.Unmarshal(bytes.NewReader(data))
+			_, err := b.Unmarshal(bytes.NewReader(data), surge.MaxBytes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect([]byte(b)).To(HaveLen(len(data) - 4))
 			Expect([]byte(b)).To(HaveCap(len(data) - 4))
@@ -88,11 +89,11 @@ var _ = Describe("Bytes32", func() {
 				buf := new(bytes.Buffer)
 
 				y := abi.Bytes32(x)
-				err := y.Marshal(buf)
+				_, err := y.Marshal(buf)
 				Expect(err).ToNot(HaveOccurred())
 
 				z := abi.Bytes32{}
-				err = z.Unmarshal(buf)
+				_, err = z.Unmarshal(buf, surge.MaxBytes)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(y).To(Equal(z))
@@ -133,7 +134,7 @@ var _ = Describe("Bytes32", func() {
 				5, 6, 7, 8, 9, 0, 1, 2,
 			}
 			b32 := abi.Bytes32{}
-			err := b32.Unmarshal(bytes.NewReader(data[:]))
+			_, err := b32.Unmarshal(bytes.NewReader(data[:]), surge.MaxBytes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(b32).To(HaveLen(32))
 			Expect(b32).To(HaveCap(32))

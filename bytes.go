@@ -9,39 +9,90 @@ import (
 	"github.com/renproject/surge"
 )
 
+type String string
+
+func (str String) Marshal(w io.Writer) (uint32, error) {
+	len := uint32(len(str))
+	n1, err := surge.Marshal(len, w)
+	if err != nil {
+		return n1, err
+	}
+	n2, err := w.Write([]byte(str))
+	if err != nil {
+		return n1 + uint32(n2), err
+	}
+	return n1 + uint32(n2), err
+}
+
+func (str *String) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	// Unmarshal length.
+	len := uint32(0)
+	n1, err := surge.Unmarshal(&len, r, m)
+	if err != nil {
+		return n1, err
+	}
+	m -= n1
+	if m < len {
+		return n1, surge.ErrMaxBytesExceeded
+	}
+	// Unmarshal data.
+	b := make([]byte, len)
+	n2, err := io.ReadFull(r, b)
+	if err != nil {
+		return n1 + uint32(n2), err
+	}
+	*str = String(string(b))
+	return n1 + uint32(n2), nil
+}
+
+func (str String) SizeHint() uint32 {
+	return uint32(4 + len(str)) // Length prefix + number of bytes in the string
+}
+
+func (str String) MarshalJSON() ([]byte, error) {
+	return json.Marshal(str)
+}
+
+func (str *String) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, (*string)(str))
+}
+
+func (str String) Type() Type {
+	return TypeString
+}
+
 type Bytes []byte
 
-func (b Bytes) Marshal(w io.Writer) error {
+func (b Bytes) Marshal(w io.Writer) (uint32, error) {
 	len := uint32(len(b))
-	if err := surge.Marshal(uint32(len), w); err != nil {
-		return err
+	n1, err := surge.Marshal(len, w)
+	if err != nil {
+		return n1, err
 	}
-	_, err := w.Write(b)
-	return err
+	n2, err := w.Write(b)
+	return n1 + uint32(n2), err
 }
 
-func (b *Bytes) Unmarshal(r io.Reader) error {
-	_, err := b.unmarshalAndReturnLength(r)
-	return err
-}
-
-func (b *Bytes) unmarshalAndReturnLength(r io.Reader) (uint32, error) {
+func (b *Bytes) Unmarshal(r io.Reader, m uint32) (uint32, error) {
 	len := uint32(0)
-	if err := surge.Unmarshal(&len, r); err != nil {
-		return len, err
+	n1, err := surge.Unmarshal(&len, r, m)
+	if err != nil {
+		return n1, err
 	}
-	if len > MaxSize {
-		return len, fmt.Errorf("expected len<=%v, got len=%v", MaxSize, len)
+	m -= n1
+	if m < len {
+		return n1, surge.ErrMaxBytesExceeded
 	}
 	*b = make([]byte, len)
-	if _, err := io.ReadFull(r, *b); err != nil {
-		return len, err
+	n2, err := io.ReadFull(r, *b)
+	if err != nil {
+		return n1 + uint32(n2), err
 	}
-	return len, nil
+	return n1 + uint32(n2), nil
 }
 
-func (b Bytes) SizeHint() int {
-	return 4 + len(b) // Length prefix + number of bytes in the slice
+func (b Bytes) SizeHint() uint32 {
+	return uint32(4 + len(b)) // Length prefix + number of bytes in the slice
 }
 
 func (b Bytes) MarshalJSON() ([]byte, error) {
@@ -75,19 +126,17 @@ func (b Bytes) String() string {
 
 type Bytes32 [32]byte
 
-func (b Bytes32) Marshal(w io.Writer) error {
-	_, err := w.Write(b[:])
-	return err
+func (b Bytes32) Marshal(w io.Writer) (uint32, error) {
+	n, err := w.Write(b[:])
+	return uint32(n), err
 }
 
-func (b *Bytes32) Unmarshal(r io.Reader) error {
-	if _, err := io.ReadFull(r, (*b)[:]); err != nil {
-		return err
-	}
-	return nil
+func (b *Bytes32) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	n, err := io.ReadFull(r, (*b)[:])
+	return uint32(n), err
 }
 
-func (b Bytes32) SizeHint() int {
+func (b Bytes32) SizeHint() uint32 {
 	return 32
 }
 

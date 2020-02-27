@@ -10,30 +10,40 @@ import (
 	"github.com/renproject/surge"
 )
 
+// U8 represents an 8-bit unsigned integer.
 type U8 struct {
 	inner uint8
 }
 
+// NewU8 returns a uint8 wrapped as a U8.
 func NewU8(x uint8) U8 {
 	return U8{inner: x}
 }
 
-func (u8 U8) Marshal(w io.Writer) error {
+// Marshal to binary. Returns the number of bytes written to the io.Writer.
+func (u8 U8) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u8.inner, w)
 }
 
-func (u8 *U8) Unmarshal(r io.Reader) error {
-	return surge.Unmarshal(&u8.inner, r)
+// Unmarshal from binary, with a restriction on the maximum memory allocation.
+// Returns the number of bytes read from the io.Reader.
+func (u8 *U8) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	return surge.Unmarshal(&u8.inner, r, m)
 }
 
-func (u8 U8) SizeHint() int {
+// SizeHint returns the number of bytes that a U8 requires in its binary
+// representation.
+func (u8 U8) SizeHint() uint32 {
 	return 1
 }
 
+// MarshalJSON implements the json.Marshaler interface. U8s are marshaled as
+// decimal strings (for consistency with larger integer types).
 func (u8 U8) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u8.String())
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface.
 func (u8 *U8) UnmarshalJSON(data []byte) error {
 	var xString string
 	if err := json.Unmarshal(data, &xString); err != nil {
@@ -47,14 +57,18 @@ func (u8 *U8) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Type returns the ABI object type of a U8.
 func (U8) Type() Type {
 	return TypeU8
 }
 
+// Uint8 returns the inner uint8 value.
 func (u8 U8) Uint8() uint8 {
 	return u8.inner
 }
 
+// String implements the fmt.Stringer interface. U8s are printed as decimal
+// strings.
 func (u8 U8) String() string {
 	return fmt.Sprintf("%v", u8.inner)
 }
@@ -101,15 +115,15 @@ func NewU16(x uint16) U16 {
 	return U16{inner: x}
 }
 
-func (u16 U16) Marshal(w io.Writer) error {
+func (u16 U16) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u16.inner, w)
 }
 
-func (u16 *U16) Unmarshal(r io.Reader) error {
-	return surge.Unmarshal(&u16.inner, r)
+func (u16 *U16) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	return surge.Unmarshal(&u16.inner, r, m)
 }
 
-func (u16 U16) SizeHint() int {
+func (u16 U16) SizeHint() uint32 {
 	return 2
 }
 
@@ -184,15 +198,15 @@ func NewU32(x uint32) U32 {
 	return U32{inner: x}
 }
 
-func (u32 U32) Marshal(w io.Writer) error {
+func (u32 U32) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u32.inner, w)
 }
 
-func (u32 *U32) Unmarshal(r io.Reader) error {
-	return surge.Unmarshal(&u32.inner, r)
+func (u32 *U32) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	return surge.Unmarshal(&u32.inner, r, m)
 }
 
-func (u32 U32) SizeHint() int {
+func (u32 U32) SizeHint() uint32 {
 	return 4
 }
 
@@ -267,15 +281,15 @@ func NewU64(x uint64) U64 {
 	return U64{inner: x}
 }
 
-func (u64 U64) Marshal(w io.Writer) error {
+func (u64 U64) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(u64.inner, w)
 }
 
-func (u64 *U64) Unmarshal(r io.Reader) error {
-	return surge.Unmarshal(&u64.inner, r)
+func (u64 *U64) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	return surge.Unmarshal(&u64.inner, r, m)
 }
 
-func (u64 U64) SizeHint() int {
+func (u64 U64) SizeHint() uint32 {
 	return 8
 }
 
@@ -350,23 +364,27 @@ func NewU128(x [16]byte) U128 {
 	return U128{inner: new(big.Int).SetBytes(x[:])}
 }
 
-func (u128 U128) Marshal(w io.Writer) error {
+func (u128 U128) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(paddedTo16(u128.inner), w)
 }
 
-func (u128 *U128) Unmarshal(r io.Reader) error {
+func (u128 *U128) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	if m < 16 {
+		return 0, surge.ErrMaxBytesExceeded
+	}
 	b := [16]byte{}
-	if err := surge.Unmarshal(&b, r); err != nil {
-		return err
+	n, err := surge.Unmarshal(&b, r, m)
+	if err != nil {
+		return n, err
 	}
 	if u128.inner == nil {
 		u128.inner = new(big.Int)
 	}
 	u128.inner.SetBytes(b[:])
-	return nil
+	return n, nil
 }
 
-func (u128 U128) SizeHint() int {
+func (u128 U128) SizeHint() uint32 {
 	return 16
 }
 
@@ -460,23 +478,27 @@ func NewU256(x [32]byte) U256 {
 	return U256{inner: new(big.Int).SetBytes(x[:])}
 }
 
-func (u256 U256) Marshal(w io.Writer) error {
+func (u256 U256) Marshal(w io.Writer) (uint32, error) {
 	return surge.Marshal(paddedTo32(u256.inner), w)
 }
 
-func (u256 *U256) Unmarshal(r io.Reader) error {
+func (u256 *U256) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	if m < 32 {
+		return 0, surge.ErrMaxBytesExceeded
+	}
 	b := [32]byte{}
-	if err := surge.Unmarshal(&b, r); err != nil {
-		return err
+	n, err := surge.Unmarshal(&b, r, m)
+	if err != nil {
+		return n, err
 	}
 	if u256.inner == nil {
 		u256.inner = new(big.Int)
 	}
 	u256.inner.SetBytes(b[:])
-	return nil
+	return n, nil
 }
 
-func (u256 U256) SizeHint() int {
+func (u256 U256) SizeHint() uint32 {
 	return 32
 }
 

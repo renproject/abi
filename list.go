@@ -2,7 +2,6 @@ package abi
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"github.com/renproject/surge"
@@ -20,71 +19,83 @@ func NewListWithCapacity(cap int) List {
 	return List{inner: make([]Value, 0, cap)}
 }
 
-func (ls List) Marshal(w io.Writer) error {
+func (ls List) Marshal(w io.Writer) (uint32, error) {
+	// Marshal length.
 	b := [4]byte{}
 	binary.LittleEndian.PutUint32(b[:], uint32(len(ls.inner)))
-	if _, err := w.Write(b[:]); err != nil {
-		return err
+	n, err := w.Write(b[:])
+	if err != nil {
+		return uint32(n), err
 	}
+	// Marshal elements,
+	n1 := uint32(n)
 	for _, elem := range ls.inner {
-		// Use the top-level marshaling function so that type information is
-		// written.
-		if err := Marshal(elem, w); err != nil {
-			return err
+		// Marshal type.
+		n2, err := elem.Type().Marshal(w)
+		n1 += n2
+		if err != nil {
+			return n1, err
+		}
+		// Marshal value.
+		n3, err := elem.Marshal(w)
+		n1 += n3
+		if err != nil {
+			return n1, err
 		}
 	}
-	return nil
+	return n1, nil
 }
-
-func (ls *List) Unmarshal(r io.Reader) error {
-	_, err := ls.unmarshalAndReturnSize(r, MaxSize)
-	return err
-}
-
-func (ls *List) unmarshalAndReturnSize(r io.Reader, maxSize uint32) (uint32, error) {
+func (ls *List) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	// Unmarshal the length.
 	len := uint32(0)
-	if err := surge.Unmarshal(&len, r); err != nil {
-		return 0, err
+	n1, err := surge.Unmarshal(&len, r, m)
+	if err != nil {
+		return n1, err
 	}
-
-	// Restrict the size of the abstract data type to prevent malicious input
-	// forcing massive memory allocations.
-	if len > maxSize {
-		return 0, fmt.Errorf("expected size<=%v, got size=%v", maxSize, len)
+	m -= n1
+	if m < n1 {
+		return n1, surge.ErrMaxBytesExceeded
 	}
 	ls.inner = make([]Value, 0, len)
-	maxSize -= len
-	if maxSize < 0 {
-		return len, fmt.Errorf("exceeded maximum size")
-	}
 
-	sizeInBytes := len
+	// Unmarshal elements.
 	for i := uint32(0); i < len; i++ {
-		// Use top-level unmarshaling function so that type information is read.
-		elem, elemSize, err := unmarshalAndReturnSize(r, maxSize)
+		// Unmarshal type.
+		var ty Type
+		n2, err := ty.Unmarshal(r, m)
+		n1 += n2
+		m -= n2
 		if err != nil {
-			return sizeInBytes, err
+			return n1, err
 		}
 
-		// Restrict the size of the abstract data type to prevent malicious input
-		// forcing massive memory allocations.
-		sizeInBytes += (elemSize - 1) // Offset by -1, because we started with sizeInBytes := len
-		maxSize -= (elemSize - 1)     // Offset by -1, because we have already done maxSize -= len
-		if maxSize < 0 {
-			return sizeInBytes, fmt.Errorf("exceeded maximum size")
+		// Unmarshal value
+		v, n3, err := Unmarshal(r, ty, m)
+		n1 += n3
+		m -= n3
+		if err != nil {
+			return n1, err
 		}
-		ls.inner = append(ls.inner, elem)
+		ls.inner = append(ls.inner, v)
 	}
-	return sizeInBytes, nil
+	return n1, nil
 }
 
-func (ls List) SizeHint() int {
-	size := 4 // Size of length prefix
+func (ls List) SizeHint() uint32 {
+	size := uint32(4) // Size of length prefix
 	for _, elem := range ls.inner {
-		size += 2               // Size of element type prefix
-		size += elem.SizeHint() // Size of element
+		size += elem.Type().SizeHint() // Size of element type
+		size += elem.SizeHint()        // Size of element value
 	}
 	return size
+}
+
+func (ls List) MarshalJSON() ([]byte, error) {
+	panic("unimplemented")
+}
+
+func (ls *List) UnmarshalJSON(data []byte) error {
+	panic("unimplemented")
 }
 
 func (List) Type() Type {
