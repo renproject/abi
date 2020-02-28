@@ -4,11 +4,16 @@ import (
 	"io"
 
 	"github.com/renproject/abi"
+	"github.com/renproject/abi/ext"
 	"github.com/renproject/surge"
 )
 
 // An Address represents a Bitcoin address (with SegWit support).
 type Address abi.String
+
+func (Address) Type() abi.Type {
+	return ext.TypeBitcoinAddress
+}
 
 // A UTXOIndex uniquely identifies an unspent transaction output, and can be
 // used to find the complete UTXO information on the Bitcoin blockchain.
@@ -53,6 +58,10 @@ func (utxoi *UTXOIndex) Unmarshal(r io.Reader, m uint32) (uint32, error) {
 
 func (utxoi UTXOIndex) SizeHint() uint32 {
 	return utxoi.TxHash.SizeHint() + utxoi.VOut.SizeHint()
+}
+
+func (UTXOIndex) Type() abi.Type {
+	return ext.TypeBitcoinUTXOIndex
 }
 
 // A UTXO is the complete information of an unspent transaction output. It
@@ -112,4 +121,8 @@ func (utxo *UTXO) Unmarshal(r io.Reader, m uint32) (uint32, error) {
 
 func (utxo UTXO) SizeHint() uint32 {
 	return utxo.TxHash.SizeHint() + utxo.VOut.SizeHint()
+}
+
+func (UTXO) Type() abi.Type {
+	return ext.TypeBitcoinUTXO
 }

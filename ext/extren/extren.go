@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/renproject/abi"
+	"github.com/renproject/abi/ext"
 	"github.com/renproject/surge"
 )
 
@@ -111,55 +112,8 @@ func (tx Tx) SizeHint() uint32 {
 		tx.Out.SizeHint()
 }
 
-type Arguments []Argument
-
-func (args Arguments) Marshal(w io.Writer) (uint32, error) {
-	// Marshal length.
-	n1, err := surge.Marshal(uint32(len(args)), w)
-	if err != nil {
-		return n1, err
-	}
-	// Marshal arguments.
-	for _, arg := range args {
-		n2, err := surge.Marshal(arg, w)
-		n1 += n2
-		if err != nil {
-			return n1, err
-		}
-	}
-	return n1, nil
-}
-
-func (args *Arguments) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	len := uint32(0)
-	n1, err := surge.Unmarshal(&len, r, m)
-	if err != nil {
-		return n1, err
-	}
-	m -= n1
-	if m < len {
-		return n1, surge.ErrMaxBytesExceeded
-	}
-	*args = make([]Argument, 0, len)
-	for i := uint32(0); i < len; i++ {
-		var arg Argument
-		n2, err := surge.Unmarshal(&arg, r, m)
-		n1 += n2
-		m -= n2
-		if err != nil {
-			return n1, err
-		}
-		*args = append(*args, arg)
-	}
-	return n1, nil
-}
-
-func (args Arguments) SizeHint() uint32 {
-	size := uint32(4)
-	for _, arg := range args {
-		size += arg.SizeHint()
-	}
-	return size
+func (Tx) Type() abi.Type {
+	return ext.TypeRenVMTx
 }
 
 type Argument struct {
@@ -270,4 +224,63 @@ func (arg *Argument) UnmarshalJSON(data []byte) error {
 	arg.Name = name
 	arg.Value = value
 	return nil
+}
+
+func (Argument) Type() abi.Type {
+	return ext.TypeRenVMArgument
+}
+
+type Arguments []Argument
+
+func (args Arguments) Marshal(w io.Writer) (uint32, error) {
+	// Marshal length.
+	n1, err := surge.Marshal(uint32(len(args)), w)
+	if err != nil {
+		return n1, err
+	}
+	// Marshal arguments.
+	for _, arg := range args {
+		n2, err := surge.Marshal(arg, w)
+		n1 += n2
+		if err != nil {
+			return n1, err
+		}
+	}
+	return n1, nil
+}
+
+func (args *Arguments) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+	len := uint32(0)
+	n1, err := surge.Unmarshal(&len, r, m)
+	if err != nil {
+		return n1, err
+	}
+	m -= n1
+	if m < len {
+		return n1, surge.ErrMaxBytesExceeded
+	}
+	*args = make([]Argument, 0, len)
+	for i := uint32(0); i < len; i++ {
+		var arg Argument
+		n2, err := surge.Unmarshal(&arg, r, m)
+		n1 += n2
+		m -= n2
+		if err != nil {
+			return n1, err
+		}
+		*args = append(*args, arg)
+	}
+	return n1, nil
+}
+
+func (args Arguments) SizeHint() uint32 {
+	size := uint32(4)
+	for _, arg := range args {
+		size += arg.SizeHint()
+	}
+	return size
+}
+
+func (Arguments) Type() abi.Type {
+	return ext.TypeRenVMArguments
 }
