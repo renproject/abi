@@ -10,7 +10,7 @@ import (
 type Address abi.String
 
 func (Address) Type() abi.Type {
-	return ext.TypeBCashAddress
+	return ext.TypeBitcoinCashAddress
 }
 
 // A UTXOIndex uniquely identifies an unspent transaction output, and can be
