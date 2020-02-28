@@ -7,8 +7,10 @@ import (
 
 	"github.com/renproject/abi"
 	"github.com/renproject/abi/ext"
-	"github.com/renproject/abi/ext/exttx"
 	"github.com/renproject/surge"
+
+	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type Address ethcommon.Address
@@ -36,7 +38,7 @@ func (Address) SizeHint() uint32 {
 }
 
 func (Address) Type() abi.Type {
-	return ext.ExtTypeEthereumAddress
+	return ext.TypeEthereumAddress
 }
 
 type Tx struct {
@@ -60,55 +62,55 @@ func (tx Tx) SizeHint() uint32 {
 }
 
 func (Tx) Type() abi.Type {
-	return ExtTypeEthereumTx
+	return ext.TypeEthereumTx
 }
 
 // EncodeArguments into an Ethereum ABI compatible byte slice.
-func EncodeArguments(args exttx.Arguments) []byte {
-	ethargs := make(ethabi.Arguments, 0, len(args))
-	ethvals := make([]interface{}, 0, len(args))
+func EncodeArguments(ls abi.List) []byte {
+	ethargs := make(ethabi.Arguments, 0, ls.Len())
+	ethvals := make([]interface{}, 0, ls.Len())
 
-	for _, arg := range args {
+	ls.ForEach(func(_ int, elem abi.Value) {
 		var val interface{}
 		var ty ethabi.Type
 		var err error
 
-		switch arg.Value.Type() {
+		switch elem.Type() {
 		case abi.TypeString:
-			val = arg.Value.(abi.String)
+			val = elem.(abi.String)
 			ty, err = ethabi.NewType("string", nil)
 		case abi.TypeBytes:
-			val = arg.Value.(abi.Bytes)
+			val = elem.(abi.Bytes)
 			ty, err = ethabi.NewType("bytes", nil)
 		case abi.TypeBytes32:
-			val = arg.Value.(abi.Bytes32)
+			val = elem.(abi.Bytes32)
 			ty, err = ethabi.NewType("bytes32", nil)
 
 		case abi.TypeU8:
-			val = big.NewInt(0).SetUint64(uint64(arg.Value.(abi.U8).Uint8()))
+			val = big.NewInt(0).SetUint64(uint64(elem.(abi.U8).Uint8()))
 			ty, err = ethabi.NewType("uint256", nil)
 		case abi.TypeU16:
-			val = big.NewInt(0).SetUint64(uint64(arg.Value.(abi.U16).Uint16()))
+			val = big.NewInt(0).SetUint64(uint64(elem.(abi.U16).Uint16()))
 			ty, err = ethabi.NewType("uint256", nil)
 		case abi.TypeU32:
-			val = big.NewInt(0).SetUint64(uint64(arg.Value.(abi.U32).Uint32()))
+			val = big.NewInt(0).SetUint64(uint64(elem.(abi.U32).Uint32()))
 			ty, err = ethabi.NewType("uint256", nil)
 		case abi.TypeU64:
-			val = big.NewInt(0).SetUint64(uint64(arg.Value.(abi.U64).Uint64()))
+			val = big.NewInt(0).SetUint64(uint64(elem.(abi.U64).Uint64()))
 			ty, err = ethabi.NewType("uint256", nil)
 		case abi.TypeU128:
-			val = arg.Value.(abi.U128).Int()
+			val = elem.(abi.U128).Int()
 			ty, err = ethabi.NewType("uint256", nil)
 		case abi.TypeU256:
-			val = arg.Value.(abi.U256).Int()
+			val = elem.(abi.U256).Int()
 			ty, err = ethabi.NewType("uint256", nil)
 
-		case ext.ExtTypeEthereumAddress:
-			val = arg.Value.(ExtTypeEthereumAddress)
+		case ext.TypeEthereumAddress:
+			val = elem.(Address)
 			ty, err = ethabi.NewType("address", nil)
 
 		default:
-			panic(fmt.Errorf("unexpected type=%v", arg.Value.Type()))
+			panic(fmt.Errorf("unexpected type=%v", elem.Type()))
 		}
 
 		if err != nil {
@@ -118,7 +120,7 @@ func EncodeArguments(args exttx.Arguments) []byte {
 			Type: ty,
 		})
 		ethvals = append(ethvals, val)
-	}
+	})
 
 	packed, err := ethargs.Pack(ethvals...)
 	if err != nil {
