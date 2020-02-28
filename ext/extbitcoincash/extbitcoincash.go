@@ -1,4 +1,4 @@
-package extbcash
+package extbitcoincash
 
 import (
 	"github.com/renproject/abi"
