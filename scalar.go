@@ -623,12 +623,20 @@ func (u128 U128) SizeHint() int {
 }
 
 func (u128 U128) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	b16 := paddedTo16(u128.inner)
 	n, err := w.Write(b16[:])
 	return m - n, err
 }
 
 func (u128 *U128) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	b16 := [16]byte{}
 	n, err := io.ReadFull(r, b16[:])
 	if err != nil {
@@ -773,12 +781,20 @@ func (u256 U256) SizeHint() int {
 }
 
 func (u256 U256) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	b32 := paddedTo32(u256.inner)
 	n, err := w.Write(b32[:])
 	return m - n, err
 }
 
 func (u256 *U256) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	b32 := [32]byte{}
 	n, err := io.ReadFull(r, b32[:])
 	if err != nil {
