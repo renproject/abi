@@ -24,7 +24,7 @@ var _ = Describe("Bytes", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				y := abi.Bytes(random)
-				_, err = y.Marshal(buf)
+				_, err = y.Marshal(buf, abi.MaxBytes)
 				Expect(err).ToNot(HaveOccurred())
 
 				z := abi.Bytes{}
@@ -73,7 +73,7 @@ var _ = Describe("Bytes", func() {
 				9, 0, 1, 2, 3, 4, 5, 6, // Data
 			}
 			b := abi.Bytes{}
-			_, err := b.Unmarshal(bytes.NewReader(data), surge.MaxBytes)
+			_, err := b.Unmarshal(bytes.NewReader(data), abi.MaxBytes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect([]byte(b)).To(HaveLen(len(data) - 4))
 			Expect([]byte(b)).To(HaveCap(len(data) - 4))
@@ -89,11 +89,11 @@ var _ = Describe("Bytes32", func() {
 				buf := new(bytes.Buffer)
 
 				y := abi.Bytes32(x)
-				_, err := y.Marshal(buf)
+				_, err := y.Marshal(buf, abi.MaxBytes)
 				Expect(err).ToNot(HaveOccurred())
 
 				z := abi.Bytes32{}
-				_, err = z.Unmarshal(buf, surge.MaxBytes)
+				_, err = z.Unmarshal(buf, abi.MaxBytes)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(y).To(Equal(z))
@@ -134,7 +134,7 @@ var _ = Describe("Bytes32", func() {
 				5, 6, 7, 8, 9, 0, 1, 2,
 			}
 			b32 := abi.Bytes32{}
-			_, err := b32.Unmarshal(bytes.NewReader(data[:]), surge.MaxBytes)
+			_, err := b32.Unmarshal(bytes.NewReader(data[:]), abi.MaxBytes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(b32).To(HaveLen(32))
 			Expect(b32).To(HaveCap(32))

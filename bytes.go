@@ -9,90 +9,60 @@ import (
 	"github.com/renproject/surge"
 )
 
+// A String is a slice of bytes.
 type String string
 
-func (str String) Marshal(w io.Writer) (uint32, error) {
-	len := uint32(len(str))
-	n1, err := surge.Marshal(len, w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := w.Write([]byte(str))
-	if err != nil {
-		return n1 + uint32(n2), err
-	}
-	return n1 + uint32(n2), err
-}
-
-func (str *String) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	// Unmarshal length.
-	len := uint32(0)
-	n1, err := surge.Unmarshal(&len, r, m)
-	if err != nil {
-		return n1, err
-	}
-	m -= n1
-	if m < len {
-		return n1, surge.ErrMaxBytesExceeded
-	}
-	// Unmarshal data.
-	b := make([]byte, len)
-	n2, err := io.ReadFull(r, b)
-	if err != nil {
-		return n1 + uint32(n2), err
-	}
-	*str = String(string(b))
-	return n1 + uint32(n2), nil
-}
-
-func (str String) SizeHint() uint32 {
-	return uint32(4 + len(str)) // Length prefix + number of bytes in the string
-}
-
-func (str String) MarshalJSON() ([]byte, error) {
-	return json.Marshal(str)
-}
-
-func (str *String) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, (*string)(str))
-}
-
+// Type returns the type identifier.
 func (str String) Type() Type {
 	return TypeString
 }
 
+// SizeHint returns the number of bytes required to represent a string in
+// binary.
+func (str String) SizeHint() int {
+	return 4 + len(string(str))
+}
+
+// Marshal the string to binary. Marshaling will try to avoid allocating more
+// than the specified maximum number of bytes. If it needs to allocate too many
+// bytes, and error may be returned instead.
+func (str String) Marshal(w io.Writer, m int) (int, error) {
+	return surge.Marshal(w, string(str), m)
+}
+
+// Unmarshal the string from binary. Unmarshaling will not allocate more than
+// the specified maximum number of bytes. If it needs to allocate too many
+// bytes, and error is returned instead.
+func (str *String) Unmarshal(r io.Reader, m int) (int, error) {
+	return surge.Unmarshal(r, (*string)(str), m)
+}
+
+// MarshalJSON implements the JSON marshaler interface.
+func (str String) MarshalJSON() ([]byte, error) {
+	return json.Marshal(str)
+}
+
+// UnmarshalJSON implements the JSON unmarshaler interface.
+func (str *String) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, (*string)(str))
+}
+
 type Bytes []byte
 
-func (b Bytes) Marshal(w io.Writer) (uint32, error) {
-	len := uint32(len(b))
-	n1, err := surge.Marshal(len, w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := w.Write(b)
-	return n1 + uint32(n2), err
+func (b Bytes) Type() Type {
+	return TypeBytes
 }
 
-func (b *Bytes) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	len := uint32(0)
-	n1, err := surge.Unmarshal(&len, r, m)
-	if err != nil {
-		return n1, err
-	}
-	m -= n1
-	if m < len {
-		return n1, surge.ErrMaxBytesExceeded
-	}
-	*b = make([]byte, len)
-	n2, err := io.ReadFull(r, *b)
-	if err != nil {
-		return n1 + uint32(n2), err
-	}
-	return n1 + uint32(n2), nil
+func (b Bytes) SizeHint() int {
+	return surge.SizeHint([]byte(b))
 }
 
-func (b Bytes) SizeHint() uint32 {
-	return uint32(4 + len(b)) // Length prefix + number of bytes in the slice
+func (b Bytes) Marshal(w io.Writer, m int) (int, error) {
+	return surge.Marshal(w, []byte(b), m)
+}
+
+func (b *Bytes) Unmarshal(r io.Reader, m int) (int, error) {
+	return surge.Unmarshal(r, (*[]byte)(b), m)
 }
 
 func (b Bytes) MarshalJSON() ([]byte, error) {
@@ -100,24 +70,16 @@ func (b Bytes) MarshalJSON() ([]byte, error) {
 }
 
 func (b *Bytes) UnmarshalJSON(data []byte) error {
-	var bString string
-	if err := json.Unmarshal(data, &bString); err != nil {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
 		return err
 	}
-	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(bString)
+	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(str)
 	if err != nil {
 		return err
 	}
 	*b = data
 	return nil
-}
-
-func (b Bytes) Type() Type {
-	return TypeBytes
-}
-
-func (b Bytes) Len() int {
-	return len(b)
 }
 
 func (b Bytes) String() string {
@@ -126,44 +88,44 @@ func (b Bytes) String() string {
 
 type Bytes32 [32]byte
 
-func (b Bytes32) Marshal(w io.Writer) (uint32, error) {
-	n, err := w.Write(b[:])
-	return uint32(n), err
+func (b32 Bytes32) Type() Type {
+	return TypeBytes
 }
 
-func (b *Bytes32) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	n, err := io.ReadFull(r, (*b)[:])
-	return uint32(n), err
-}
-
-func (b Bytes32) SizeHint() uint32 {
+func (b32 Bytes32) SizeHint() int {
 	return 32
 }
 
-func (b Bytes32) MarshalJSON() ([]byte, error) {
-	return json.Marshal(b.String())
+func (b32 Bytes32) Marshal(w io.Writer, m int) (int, error) {
+	n, err := w.Write(b32[:])
+	return m - n, err
 }
 
-func (b *Bytes32) UnmarshalJSON(data []byte) error {
-	var bString string
-	if err := json.Unmarshal(data, &bString); err != nil {
+func (b32 *Bytes32) Unmarshal(r io.Reader, m int) (int, error) {
+	_, err := io.ReadFull(r, (*b32)[:])
+	return m, err
+}
+
+func (b32 Bytes32) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b32.String())
+}
+
+func (b32 *Bytes32) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
 		return err
 	}
-	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(bString)
+	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(str)
 	if err != nil {
 		return err
 	}
 	if len(data) != 32 {
 		return fmt.Errorf("expected len=32, got len=%v", len(data))
 	}
-	copy(b[:], data)
+	copy((*b32)[:], data)
 	return nil
 }
 
-func (b Bytes32) Type() Type {
-	return TypeBytes32
-}
-
-func (b Bytes32) String() string {
-	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b[:])
+func (b32 Bytes32) String() string {
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b32[:])
 }

@@ -4,7 +4,9 @@ import (
 	"github.com/renproject/abi"
 )
 
-// Enumeration of extension types.
+// Extension types. The standard unmarshaler will not check these extension
+// types. Instead, you must use the unmarshalers in this packages (and
+// sub-packages).
 const (
 	// Cryptographic types.
 	TypeCrypto                  = abi.Type(1000)

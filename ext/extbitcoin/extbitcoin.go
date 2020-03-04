@@ -22,19 +22,31 @@ type UTXOIndex struct {
 	VOut   abi.U32     `json:"vOut"`
 }
 
-func (utxoi UTXOIndex) Marshal(w io.Writer) (uint32, error) {
-	n1, err := utxoi.TxHash.Marshal(w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := utxoi.VOut.Marshal(w)
-	if err != nil {
-		return n1 + n2, err
-	}
-	return n1 + n2, nil
+func (UTXOIndex) Type() abi.Type {
+	return ext.TypeBitcoinUTXOIndex
 }
 
-func (utxoi *UTXOIndex) Unmarshal(r io.Reader, m uint32) (uint32, error) {
+func (utxoi UTXOIndex) SizeHint() int {
+	return utxoi.TxHash.SizeHint() + utxoi.VOut.SizeHint()
+}
+
+func (utxoi UTXOIndex) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := utxoi.TxHash.Marshal(w, m)
+	if err != nil {
+		return m, err
+	}
+	return utxoi.VOut.Marshal(w, m)
+}
+
+func (utxoi *UTXOIndex) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	n1, err := utxoi.TxHash.Unmarshal(r, m)
 	m -= n1
 	if err != nil {
@@ -56,14 +68,6 @@ func (utxoi *UTXOIndex) Unmarshal(r io.Reader, m uint32) (uint32, error) {
 	return n1 + n2, nil
 }
 
-func (utxoi UTXOIndex) SizeHint() uint32 {
-	return utxoi.TxHash.SizeHint() + utxoi.VOut.SizeHint()
-}
-
-func (UTXOIndex) Type() abi.Type {
-	return ext.TypeBitcoinUTXOIndex
-}
-
 // A UTXO is the complete information of an unspent transaction output. It
 // includes the UTXOIndex.
 type UTXO struct {
@@ -72,57 +76,40 @@ type UTXO struct {
 	ScriptPubKey abi.Bytes `json:"scriptPubKey"`
 }
 
-func (utxo UTXO) Marshal(w io.Writer) (uint32, error) {
-	n1, err := utxo.UTXOIndex.Marshal(w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := utxo.Amount.Marshal(w)
-	if err != nil {
-		return n1 + n2, err
-	}
-	n3, err := utxo.ScriptPubKey.Marshal(w)
-	if err != nil {
-		return n1 + n2 + n3, err
-	}
-	return n1 + n2 + n3, nil
+func (UTXO) Type() abi.Type {
+	return ext.TypeBitcoinUTXO
 }
 
-func (utxo *UTXO) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	n1, err := utxo.UTXOIndex.Unmarshal(r, m)
-	m -= n1
-	if err != nil {
-		return n1, err
-	}
-	if m < 0 {
-		return n1, surge.ErrMaxBytesExceeded
-	}
-
-	n2, err := utxo.Amount.Unmarshal(r, m)
-	m -= n2
-	if err != nil {
-		return n1 + n2, err
-	}
-	if m < 0 {
-		return n1 + n2, surge.ErrMaxBytesExceeded
-	}
-
-	n3, err := utxo.ScriptPubKey.Unmarshal(r, m)
-	m -= n2
-	if err != nil {
-		return n1 + n2 + n3, err
-	}
-	if m < 0 {
-		return n1 + n2 + n3, surge.ErrMaxBytesExceeded
-	}
-
-	return n1 + n2 + n3, nil
-}
-
-func (utxo UTXO) SizeHint() uint32 {
+func (utxo UTXO) SizeHint() int {
 	return utxo.TxHash.SizeHint() + utxo.VOut.SizeHint()
 }
 
-func (UTXO) Type() abi.Type {
-	return ext.TypeBitcoinUTXO
+func (utxo UTXO) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := utxo.UTXOIndex.Marshal(w, m)
+	if err != nil {
+		return m, err
+	}
+	if m, err = utxo.Amount.Marshal(w, m); err != nil {
+		return m, err
+	}
+	return utxo.ScriptPubKey.Marshal(w, m)
+}
+
+func (utxo *UTXO) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := utxo.UTXOIndex.Unmarshal(r, m)
+	if err != nil {
+		return m, err
+	}
+	if m, err = utxo.Amount.Unmarshal(r, m); err != nil {
+		return m, err
+	}
+	return utxo.ScriptPubKey.Unmarshal(r, m)
 }

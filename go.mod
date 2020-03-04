@@ -11,7 +11,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/renproject/hyperdrive v1.0.0 // indirect
-	github.com/renproject/surge v1.1.0
+	github.com/renproject/surge v1.1.1
 	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 // indirect
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
 )

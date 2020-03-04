@@ -1,6 +1,7 @@
 package extethereum
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -15,30 +16,48 @@ import (
 
 type Address ethcommon.Address
 
-func (addr Address) Marshal(w io.Writer) (uint32, error) {
-	n, err := w.Write(addr[:])
-	return uint32(n), err
+func (Address) Type() abi.Type {
+	return ext.TypeEthereumAddress
 }
 
-func (addr *Address) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	if m < ethcommon.AddressLength {
-		return 0, surge.ErrMaxBytesExceeded
+func (Address) SizeHint() int {
+	return ethcommon.AddressLength
+}
+
+func (addr Address) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
 	}
+
+	n, err := w.Write(addr[:])
+	return m - n, err
+}
+
+func (addr *Address) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= ethcommon.AddressLength {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
 	b := [ethcommon.AddressLength]byte{}
 	n, err := r.Read(b[:])
 	if err != nil {
-		return uint32(n), err
+		return m - n, err
 	}
 	*addr = Address(ethcommon.Address(b))
-	return uint32(n), nil
+	return m - n, nil
 }
 
-func (Address) SizeHint() uint32 {
-	return uint32(ethcommon.AddressLength)
+func (addr Address) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ethcommon.Address(addr).Hex())
 }
 
-func (Address) Type() abi.Type {
-	return ext.TypeEthereumAddress
+func (addr *Address) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*addr = Address(ethcommon.HexToAddress(str))
+	return nil
 }
 
 type Tx struct {
@@ -49,28 +68,28 @@ func NewTx(hash abi.Bytes32) Tx {
 	return Tx{Hash: hash}
 }
 
-func (tx Tx) Marshal(w io.Writer) (uint32, error) {
-	return tx.Hash.Marshal(w)
-}
-
-func (tx *Tx) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	return tx.Hash.Unmarshal(r, m)
-}
-
-func (tx Tx) SizeHint() uint32 {
-	return tx.Hash.SizeHint()
-}
-
 func (Tx) Type() abi.Type {
 	return ext.TypeEthereumTx
 }
 
-// EncodeArguments into an Ethereum ABI compatible byte slice.
-func EncodeArguments(ls abi.List) []byte {
-	ethargs := make(ethabi.Arguments, 0, ls.Len())
-	ethvals := make([]interface{}, 0, ls.Len())
+func (tx Tx) SizeHint() int {
+	return tx.Hash.SizeHint()
+}
 
-	ls.ForEach(func(_ int, elem abi.Value) {
+func (tx Tx) Marshal(w io.Writer, m int) (int, error) {
+	return tx.Hash.Marshal(w, m)
+}
+
+func (tx *Tx) Unmarshal(r io.Reader, m int) (int, error) {
+	return tx.Hash.Unmarshal(r, m)
+}
+
+// EncodeArguments into an Ethereum ABI compatible byte slice.
+func EncodeArguments(ls []abi.Value) []byte {
+	ethargs := make(ethabi.Arguments, 0, len(ls))
+	ethvals := make([]interface{}, 0, len(ls))
+
+	for _, elem := range ls {
 		var val interface{}
 		var ty ethabi.Type
 		var err error
@@ -120,7 +139,7 @@ func EncodeArguments(ls abi.List) []byte {
 			Type: ty,
 		})
 		ethvals = append(ethvals, val)
-	})
+	}
 
 	packed, err := ethargs.Pack(ethvals...)
 	if err != nil {

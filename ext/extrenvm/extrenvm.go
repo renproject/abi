@@ -12,104 +12,117 @@ import (
 	"github.com/renproject/surge"
 )
 
-func TxHash(to abi.String, in Arguments) abi.Bytes32 {
+// Tx represents a RenVM transaction. It may, or may not, include transactions
+// from other blockchains (if it does, then they are usually included as part of
+// the RenVM transaction inputs).
+type Tx struct {
+	// Hash of the to address and the inputs arguments.
+	Hash abi.Bytes32 `json:"hash"`
+
+	// To address specifies the RenVM address that will be receiving the
+	// transaction. For cross-chain transactions, this will be the unique
+	// human-readable address that identifies the specific cross-chain gateway
+	// being used.
+	To abi.String `json:"to"`
+
+	// In argumenst are provided by the transaction sender. These arguments may,
+	// or may not, need to be validated by the receiver. Either way, it is
+	// impossible for the receiver to generate these arguments.
+	In Arguments `json:"in"`
+
+	// Autogen arguments are can be generated from the input arguments. If these
+	// arguments were provided as input, then they would need to be validated by
+	// the receiver (which usually involves autogenerating the arguments from
+	// scratch, and comparing them against the originally provided ones).
+	Autogen Arguments `json:"autogen"`
+
+	// Out arguments are produced by executing the transaction.
+	Out Arguments `json:"out"`
+}
+
+// NewTxHash returns the Sum256 hash of the To address and In arguments for a
+// RenVM transaction. Autogen arguments are ignored because they are
+// deterministically generated from the In arguments, and the Out arguments are
+// ignored because they do not exist until the transaction has been fully
+// executed.
+func NewTxHash(to abi.String, in Arguments) abi.Bytes32 {
 	buf := new(bytes.Buffer)
-	buf.Grow(int(to.SizeHint() + in.SizeHint()))
-	if _, err := to.Marshal(buf); err != nil {
+	buf.Grow(to.SizeHint() + in.SizeHint())
+	if _, err := to.Marshal(buf, abi.MaxBytes); err != nil {
 		panic(fmt.Sprintf("error computing txhash: %v", err))
 	}
-	if _, err := in.Marshal(buf); err != nil {
+	if _, err := in.Marshal(buf, abi.MaxBytes); err != nil {
 		panic(fmt.Sprintf("error computing txhash: %v", err))
 	}
 	return abi.Bytes32(sha256.Sum256(buf.Bytes()))
 }
 
-type Tx struct {
-	Hash    abi.Bytes32 `json:"hash"`
-	To      abi.String  `json:"to"`
-	In      Arguments   `json:"in"`
-	Autogen Arguments   `json:"autogen"`
-	Out     Arguments   `json:"out"`
-}
-
+// NewTx computes the transaction hash and returns a filled in RenVM
+// transaction.
 func NewTx(to abi.String, in, autogen, out Arguments) Tx {
-	tx := Tx{
-		Hash:    abi.Bytes32{},
+	return Tx{
+		Hash:    NewTxHash(to, in),
 		To:      to,
 		In:      in,
 		Autogen: autogen,
 		Out:     out,
 	}
-	tx.Hash = TxHash(to, in)
-	return tx
 }
 
-func (tx Tx) Marshal(w io.Writer) (uint32, error) {
-	n1, err := tx.Hash.Marshal(w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := tx.To.Marshal(w)
-	n1 += n2
-	if err != nil {
-		return n1, err
-	}
-	n3, err := tx.In.Marshal(w)
-	n1 += n3
-	if err != nil {
-		return n1, err
-	}
-	n4, err := tx.Autogen.Marshal(w)
-	n1 += n4
-	if err != nil {
-		return n1, err
-	}
-	n5, err := tx.Out.Marshal(w)
-	n1 += n5
-	if err != nil {
-		return n1, err
-	}
-	return n1, nil
-}
-
-func (tx *Tx) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	n1, err := tx.Hash.Unmarshal(r, m)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := tx.To.Unmarshal(r, m)
-	n1 += n2
-	m -= n2
-	if err != nil {
-		return n1, err
-	}
-	n3, err := tx.In.Unmarshal(r, m)
-	n1 += n3
-	m -= n3
-	if err != nil {
-		return n1, err
-	}
-	n4, err := tx.Autogen.Unmarshal(r, m)
-	n1 += n4
-	m -= n4
-	if err != nil {
-		return n1, err
-	}
-	n5, err := tx.Out.Unmarshal(r, m)
-	n1 += n5
-	m -= n5
-	if err != nil {
-		return n1, err
-	}
-	return n1, nil
-}
-
-func (tx Tx) SizeHint() uint32 {
+// SizeHint returns the number of bytes required to represent this transaction
+// in binary.
+func (tx Tx) SizeHint() int {
 	return tx.Hash.SizeHint() +
 		tx.To.SizeHint() +
 		tx.In.SizeHint() +
 		tx.Autogen.SizeHint() +
 		tx.Out.SizeHint()
+}
+
+// Marshal the transaction into binary. A maximum number of bytes can be
+// allocated while marshaling (this maximum is not strict).
+func (tx Tx) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := tx.Hash.Marshal(w, m)
+	if err != nil {
+		return m, err
+	}
+	if m, err = tx.To.Marshal(w, m); err != nil {
+		return m, err
+	}
+	if m, err = tx.In.Marshal(w, m); err != nil {
+		return m, err
+	}
+	if m, err = tx.Autogen.Marshal(w, m); err != nil {
+		return m, err
+	}
+	return tx.Out.Marshal(w, m)
+}
+
+// Unmarshal the transaction from binary. A maximum number of bytes can be
+// allocated while unmarshaling (to protect against malicious input).
+func (tx *Tx) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := tx.Hash.Unmarshal(r, m)
+	if err != nil {
+		return m, err
+	}
+	if m, err = tx.To.Unmarshal(r, m); err != nil {
+		return m, err
+	}
+	if m, err = tx.In.Unmarshal(r, m); err != nil {
+		return m, err
+	}
+	if m, err = tx.Autogen.Unmarshal(r, m); err != nil {
+		return m, err
+	}
+	return tx.Out.Unmarshal(r, m)
 }
 
 func (Tx) Type() abi.Type {
@@ -121,63 +134,45 @@ type Argument struct {
 	Value abi.Value
 }
 
-func (arg Argument) Marshal(w io.Writer) (uint32, error) {
-	n1, err := arg.Name.Marshal(w)
-	if err != nil {
-		return n1, err
-	}
-	n2, err := arg.Value.Type().Marshal(w)
-	if err != nil {
-		return n1 + n2, err
-	}
-	n3, err := arg.Value.Marshal(w)
-	if err != nil {
-		return n1 + n2 + n3, err
-	}
-	return n1 + n2 + n3, nil
+func (Argument) Type() abi.Type {
+	return ext.TypeRenVMArgument
 }
 
-func (arg *Argument) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	// Unmarshal arg name.
-	var name abi.String
-	n1, err := name.Unmarshal(r, m)
-	m -= n1
-	if err != nil {
-		return n1, err
-	}
-
-	// Unmarshal arg type.
-	var ty abi.Type
-	n2, err := ty.Unmarshal(r, m)
-	n1 += n2
-	m -= n2
-	if err != nil {
-		return n1, err
-	}
-
-	// Unmarshal arg value.
-	value, n3, err := abi.Unmarshal(r, ty, m)
-	n1 += n3
-	if err != nil {
-		return n1, err
-	}
-
-	arg.Name = name
-	arg.Value = value
-	return n1, err
-}
-
-func (arg Argument) SizeHint() uint32 {
+func (arg Argument) SizeHint() int {
 	return arg.Name.SizeHint() +
 		arg.Value.Type().SizeHint() +
 		arg.Value.SizeHint()
 }
 
+func (arg Argument) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := arg.Name.Marshal(w, m)
+	if err != nil {
+		return m, err
+	}
+	return abi.Marshal(w, arg.Value, m)
+}
+
+func (arg *Argument) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	m, err := arg.Name.Unmarshal(r, m)
+	if err != nil {
+		return m, err
+	}
+	arg.Value, m, err = abi.Unmarshal(r, m)
+	return m, err
+}
+
 func (arg Argument) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"name":  arg.Name,
-		"type":  arg.Value.Type(),
-		"value": arg.Value,
+		"value": []json.Marshaler{arg.Value.Type(), arg.Value},
 	}
 	return json.Marshal(m)
 }
@@ -187,36 +182,15 @@ func (arg *Argument) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	if len(m) > 3 {
-		return fmt.Errorf("too many fields")
-	}
 
 	// Unmarshal arg name.
-	rawName, ok := m["name"]
-	if !ok {
-		return fmt.Errorf("field not found: 'name'")
-	}
 	var name abi.String
-	if err := name.UnmarshalJSON(rawName); err != nil {
-		return err
-	}
-
-	// Unmarshal arg type.
-	rawType, ok := m["type"]
-	if !ok {
-		return fmt.Errorf("field not found: 'type'")
-	}
-	var ty abi.Type
-	if err := ty.UnmarshalJSON(rawType); err != nil {
+	if err := name.UnmarshalJSON(m["name"]); err != nil {
 		return err
 	}
 
 	// Unmarshal arg value.
-	rawValue, ok := m["value"]
-	if !ok {
-		return fmt.Errorf("field not found: 'value'")
-	}
-	value, err := abi.UnmarshalJSON(rawValue, ty)
+	value, err := abi.UnmarshalJSON(m["value"])
 	if err != nil {
 		return err
 	}
@@ -226,61 +200,68 @@ func (arg *Argument) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (Argument) Type() abi.Type {
-	return ext.TypeRenVMArgument
-}
-
 type Arguments []Argument
 
-func (args Arguments) Marshal(w io.Writer) (uint32, error) {
-	// Marshal length.
-	n1, err := surge.Marshal(uint32(len(args)), w)
-	if err != nil {
-		return n1, err
-	}
-	// Marshal arguments.
-	for _, arg := range args {
-		n2, err := surge.Marshal(arg, w)
-		n1 += n2
-		if err != nil {
-			return n1, err
-		}
-	}
-	return n1, nil
+func (Arguments) Type() abi.Type {
+	return ext.TypeRenVMArguments
 }
 
-func (args *Arguments) Unmarshal(r io.Reader, m uint32) (uint32, error) {
-	len := uint32(0)
-	n1, err := surge.Unmarshal(&len, r, m)
-	if err != nil {
-		return n1, err
-	}
-	m -= n1
-	if m < len {
-		return n1, surge.ErrMaxBytesExceeded
-	}
-	*args = make([]Argument, 0, len)
-	for i := uint32(0); i < len; i++ {
-		var arg Argument
-		n2, err := surge.Unmarshal(&arg, r, m)
-		n1 += n2
-		m -= n2
-		if err != nil {
-			return n1, err
-		}
-		*args = append(*args, arg)
-	}
-	return n1, nil
-}
-
-func (args Arguments) SizeHint() uint32 {
-	size := uint32(4)
+func (args Arguments) SizeHint() int {
+	size := 4
 	for _, arg := range args {
 		size += arg.SizeHint()
 	}
 	return size
 }
 
-func (Arguments) Type() abi.Type {
-	return ext.TypeRenVMArguments
+func (args Arguments) Marshal(w io.Writer, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	// Marshal length.
+	m, err := surge.Marshal(w, uint32(len(args)), m)
+	if err != nil {
+		return m, err
+	}
+	// Marshal arguments.
+	for _, arg := range args {
+		m, err = abi.Marshal(w, arg, m)
+		if err != nil {
+			return m, err
+		}
+	}
+	return m, nil
+}
+
+func (args *Arguments) Unmarshal(r io.Reader, m int) (int, error) {
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	// Unmarshal length.
+	len := uint32(0)
+	m, err := surge.Unmarshal(r, &len, m)
+	if err != nil {
+		return m, err
+	}
+	// Check length.
+	if int(len) < 0 {
+		return m, fmt.Errorf("unmarshal error: len>=0, got len=%v", int(len))
+	}
+	m -= int(len)
+	if m <= 0 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+	// Unmarshal args.
+	*args = make([]Argument, 0, len)
+	for i := 0; i < int(len); i++ {
+		var arg Argument
+		m, err = arg.Unmarshal(r, m)
+		if err != nil {
+			return m, err
+		}
+		*args = append(*args, arg)
+	}
+	return m, nil
 }
