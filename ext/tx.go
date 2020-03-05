@@ -1,4 +1,4 @@
-package extrenvm
+package ext
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"io"
 
 	"github.com/renproject/abi"
-	"github.com/renproject/abi/ext"
 	"github.com/renproject/surge"
 )
 
@@ -126,7 +125,7 @@ func (tx *Tx) Unmarshal(r io.Reader, m int) (int, error) {
 }
 
 func (Tx) Type() abi.Type {
-	return ext.TypeRenVMTx
+	return TypeRenVMTx
 }
 
 type Argument struct {
@@ -135,7 +134,7 @@ type Argument struct {
 }
 
 func (Argument) Type() abi.Type {
-	return ext.TypeRenVMArgument
+	return TypeRenVMArgument
 }
 
 func (arg Argument) SizeHint() int {
@@ -172,7 +171,7 @@ func (arg *Argument) Unmarshal(r io.Reader, m int) (int, error) {
 func (arg Argument) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
 		"name":  arg.Name,
-		"value": []json.Marshaler{arg.Value.Type(), arg.Value},
+		"value": []json.Marshaler{arg.Value.Type(), arg.Value}, // FIXME: This breaks backwards compat.
 	}
 	return json.Marshal(m)
 }
@@ -188,7 +187,6 @@ func (arg *Argument) UnmarshalJSON(data []byte) error {
 	if err := name.UnmarshalJSON(m["name"]); err != nil {
 		return err
 	}
-
 	// Unmarshal arg value.
 	value, err := abi.UnmarshalJSON(m["value"])
 	if err != nil {
@@ -203,7 +201,7 @@ func (arg *Argument) UnmarshalJSON(data []byte) error {
 type Arguments []Argument
 
 func (Arguments) Type() abi.Type {
-	return ext.TypeRenVMArguments
+	return TypeRenVMArguments
 }
 
 func (args Arguments) SizeHint() int {

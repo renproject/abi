@@ -1,10 +1,9 @@
-package extbitcoin
+package ext
 
 import (
 	"io"
 
 	"github.com/renproject/abi"
-	"github.com/renproject/abi/ext"
 	"github.com/renproject/surge"
 )
 
@@ -12,7 +11,7 @@ import (
 type Address abi.String
 
 func (Address) Type() abi.Type {
-	return ext.TypeBitcoinAddress
+	return TypeBitcoinAddress
 }
 
 // A UTXOIndex uniquely identifies an unspent transaction output, and can be
@@ -23,7 +22,7 @@ type UTXOIndex struct {
 }
 
 func (UTXOIndex) Type() abi.Type {
-	return ext.TypeBitcoinUTXOIndex
+	return TypeBitcoinUTXOIndex
 }
 
 func (utxoi UTXOIndex) SizeHint() int {
@@ -77,7 +76,7 @@ type UTXO struct {
 }
 
 func (UTXO) Type() abi.Type {
-	return ext.TypeBitcoinUTXO
+	return TypeBitcoinUTXO
 }
 
 func (utxo UTXO) SizeHint() int {

@@ -1,4 +1,4 @@
-package extethereum
+package ext
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/renproject/abi"
-	"github.com/renproject/abi/ext"
 	"github.com/renproject/surge"
 
 	ethabi "github.com/ethereum/go-ethereum/accounts/abi"
@@ -17,7 +16,7 @@ import (
 type Address ethcommon.Address
 
 func (Address) Type() abi.Type {
-	return ext.TypeEthereumAddress
+	return TypeEthereumAddress
 }
 
 func (Address) SizeHint() int {
@@ -69,7 +68,7 @@ func NewTx(hash abi.Bytes32) Tx {
 }
 
 func (Tx) Type() abi.Type {
-	return ext.TypeEthereumTx
+	return TypeEthereumTx
 }
 
 func (tx Tx) SizeHint() int {
@@ -124,7 +123,7 @@ func EncodeArguments(ls []abi.Value) []byte {
 			val = elem.(abi.U256).Int()
 			ty, err = ethabi.NewType("uint256", nil)
 
-		case ext.TypeEthereumAddress:
+		case TypeEthereumAddress:
 			val = elem.(Address)
 			ty, err = ethabi.NewType("address", nil)
 

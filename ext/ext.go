@@ -19,10 +19,10 @@ const (
 	TypeCryptoShamirS256PrivKey = TypeCrypto + abi.Type(7)
 
 	// RenVM types.
-	TypeRenVM          = abi.Type(1100)
-	TypeRenVMTx        = TypeRenVM + abi.Type(1)
-	TypeRenVMArgument  = TypeRenVM + abi.Type(2)
-	TypeRenVMArguments = TypeRenVM + abi.Type(3)
+	Type          = abi.Type(1100)
+	TypeTx        = Type + abi.Type(1)
+	TypeArgument  = Type + abi.Type(2)
+	TypeArguments = Type + abi.Type(3)
 
 	// Ethereum types.
 	TypeEthereum        = abi.Type(1200)
