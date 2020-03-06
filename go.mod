@@ -7,7 +7,6 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20200224203130-895b4c57c44d // indirect
 	github.com/btcsuite/btcutil v1.0.1 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
-	github.com/ethereum/go-ethereum v1.9.5
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/renproject/hyperdrive v1.0.0 // indirect

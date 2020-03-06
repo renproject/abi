@@ -26,6 +26,7 @@ const (
 	TypeString  = Type(1)
 	TypeBytes   = Type(2)
 	TypeBytes32 = Type(3)
+	TypeBytes65 = Type(4)
 
 	// Scalar types
 	TypeBool = Type(11)
@@ -46,7 +47,7 @@ const (
 // conversion fails.
 func NewTypeFromUint16(i uint16) (Type, bool) {
 	switch Type(i) {
-	case TypeString, TypeBytes, TypeBytes32:
+	case TypeString, TypeBytes, TypeBytes32, TypeBytes65:
 		return Type(i), true
 	case TypeBool, TypeU8, TypeU16, TypeU32, TypeU64, TypeU128, TypeU256:
 		return Type(i), true
@@ -67,6 +68,8 @@ func NewTypeFromString(str string) (Type, bool) {
 		return TypeBytes, true
 	case TypeBytes32.String():
 		return TypeBytes32, true
+	case TypeBytes65.String():
+		return TypeBytes65, true
 
 	case TypeBool.String():
 		return TypeBool, true
@@ -153,6 +156,8 @@ func (ty Type) String() string {
 		return "b"
 	case TypeBytes32:
 		return "b32"
+	case TypeBytes65:
+		return "b65"
 
 	case TypeBool:
 		return "bool"
@@ -228,6 +233,10 @@ func Unmarshal(r io.Reader, m int) (Value, int, error) {
 		var b32 Bytes32
 		m, err := b32.Unmarshal(r, m)
 		return b32, m, err
+	case TypeBytes65:
+		var b65 Bytes65
+		m, err := b65.Unmarshal(r, m)
+		return b65, m, err
 
 	// Scalars
 	case TypeBool:
@@ -272,10 +281,6 @@ func MarshalJSON(v Value) ([]byte, error) {
 	return json.Marshal([]json.Marshaler{v.Type(), v})
 }
 
-// Unmarshal a value to binary. This uses surge to read a type identifier,
-// before using the type identifier to read a concrete value. The type
-// identifier prefix is necessary, because the reader does not necessarily know
-// what type of value they are about to read.
 func UnmarshalJSON(data []byte) (Value, error) {
 	raw := []json.RawMessage{}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -310,6 +315,12 @@ func UnmarshalJSON(data []byte) (Value, error) {
 			return nil, err
 		}
 		return b32, nil
+	case TypeBytes65:
+		var b65 Bytes65
+		if err := b65.UnmarshalJSON(raw[1]); err != nil {
+			return nil, err
+		}
+		return b65, nil
 
 	// Scalars
 	case TypeBool:

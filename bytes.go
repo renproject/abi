@@ -129,3 +129,47 @@ func (b32 *Bytes32) UnmarshalJSON(data []byte) error {
 func (b32 Bytes32) String() string {
 	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b32[:])
 }
+
+type Bytes65 [32]byte
+
+func (b65 Bytes65) Type() Type {
+	return TypeBytes
+}
+
+func (b65 Bytes65) SizeHint() int {
+	return 65
+}
+
+func (b65 Bytes65) Marshal(w io.Writer, m int) (int, error) {
+	n, err := w.Write(b65[:])
+	return m - n, err
+}
+
+func (b65 *Bytes65) Unmarshal(r io.Reader, m int) (int, error) {
+	_, err := io.ReadFull(r, (*b65)[:])
+	return m, err
+}
+
+func (b65 Bytes65) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b65.String())
+}
+
+func (b65 *Bytes65) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(str)
+	if err != nil {
+		return err
+	}
+	if len(data) != 65 {
+		return fmt.Errorf("expected len=65, got len=%v", len(data))
+	}
+	copy((*b65)[:], data)
+	return nil
+}
+
+func (b65 Bytes65) String() string {
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b32[:])
+}
