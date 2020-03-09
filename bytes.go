@@ -171,5 +171,5 @@ func (b65 *Bytes65) UnmarshalJSON(data []byte) error {
 }
 
 func (b65 Bytes65) String() string {
-	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b32[:])
+	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b65[:])
 }
