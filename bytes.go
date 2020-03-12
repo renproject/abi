@@ -130,7 +130,7 @@ func (b32 Bytes32) String() string {
 	return base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString(b32[:])
 }
 
-type Bytes65 [32]byte
+type Bytes65 [65]byte
 
 func (b65 Bytes65) Type() Type {
 	return TypeBytes
