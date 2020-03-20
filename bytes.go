@@ -39,7 +39,7 @@ func (str *String) Unmarshal(r io.Reader, m int) (int, error) {
 
 // MarshalJSON implements the JSON marshaler interface.
 func (str String) MarshalJSON() ([]byte, error) {
-	return json.Marshal(str)
+	return json.Marshal(string(str))
 }
 
 // UnmarshalJSON implements the JSON unmarshaler interface.
